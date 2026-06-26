@@ -9,9 +9,16 @@ from pathlib import Path
 ROOT = Path.home() / "hermes-coding-room"
 LOG_DIR = ROOT / "logs"
 MEMORY_DIR = ROOT / "memory"
+JOBS_DIR = ROOT / "jobs"
+JOBS_RUNNING_DIR = JOBS_DIR / "running"
+JOBS_DONE_DIR = JOBS_DIR / "done"
+JOBS_FAILED_DIR = JOBS_DIR / "failed"
 
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 MEMORY_DIR.mkdir(parents=True, exist_ok=True)
+JOBS_RUNNING_DIR.mkdir(parents=True, exist_ok=True)
+JOBS_DONE_DIR.mkdir(parents=True, exist_ok=True)
+JOBS_FAILED_DIR.mkdir(parents=True, exist_ok=True)
 
 WORKER_LOG = LOG_DIR / "local_worker.log"
 LATEST_JSON = MEMORY_DIR / "latest_result_compact.json"
@@ -51,6 +58,14 @@ def find_blocked_pattern(value: str):
         if pattern.lower() in lowered:
             return pattern
     return None
+
+
+def make_job_id(task: str) -> str:
+    ts = time.strftime("%Y%m%d_%H%M%S")
+    safe = "".join(ch if ch.isalnum() else "_" for ch in task[:40]).strip("_")
+    if not safe:
+        safe = "task"
+    return f"job_{ts}_{safe[:40]}"
 
 
 def json_response(handler, status_code: int, payload: dict):
@@ -138,8 +153,21 @@ class HermesWorkerHandler(BaseHTTPRequestHandler):
         if not test_cmd:
             test_cmd = "python3 -m py_compile workspace/*.py"
 
+        job_id = make_job_id(task)
+        running_job_file = JOBS_RUNNING_DIR / f"{job_id}.json"
+        done_job_file = JOBS_DONE_DIR / f"{job_id}.json"
+        failed_job_file = JOBS_FAILED_DIR / f"{job_id}.json"
+
+        running_job_file.write_text(json.dumps({
+            "job_id": job_id,
+            "status": "running",
+            "task": task,
+            "test_cmd": test_cmd,
+            "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        }, ensure_ascii=False, indent=2), encoding="utf-8")
+
         write_log("=" * 80)
-        write_log("Received task")
+        write_log(f"Received task job_id={job_id}")
         write_log(f"TASK: {task}")
         write_log(f"TEST_CMD: {test_cmd}")
 
@@ -180,25 +208,77 @@ class HermesWorkerHandler(BaseHTTPRequestHandler):
                 except Exception as e:
                     latest = {"ok": False, "error": f"failed to parse latest json: {e}"}
 
-            json_response(self, 200, {
+            response_payload = {
                 "ok": proc.returncode == 0,
+                "job_id": job_id,
                 "exit_code": proc.returncode,
                 "duration_sec": duration,
                 "latest": latest,
                 "stdout_tail": proc.stdout[-2000:],
                 "stderr_tail": proc.stderr[-2000:],
-            })
+            }
+
+            final_job_payload = {
+                "job_id": job_id,
+                "status": "done" if proc.returncode == 0 else "failed",
+                "task": task,
+                "test_cmd": test_cmd,
+                "duration_sec": duration,
+                "exit_code": proc.returncode,
+                "latest": latest,
+                "finished_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            }
+
+            target_file = done_job_file if proc.returncode == 0 else failed_job_file
+            target_file.write_text(json.dumps(final_job_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+            try:
+                if running_job_file.exists():
+                    running_job_file.unlink()
+            except Exception as e:
+                write_log(f"ERROR: failed to remove running job file: {e}")
+
+            json_response(self, 200, response_payload)
 
         except subprocess.TimeoutExpired:
             write_log("ERROR: bridge timeout")
+            payload = {
+                "job_id": job_id,
+                "status": "failed",
+                "task": task,
+                "test_cmd": test_cmd,
+                "error": "bridge timeout",
+                "finished_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            failed_job_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+            try:
+                if running_job_file.exists():
+                    running_job_file.unlink()
+            except Exception as e:
+                write_log(f"ERROR: failed to remove running job file: {e}")
             json_response(self, 504, {
                 "ok": False,
+                "job_id": job_id,
                 "error": "bridge timeout",
             })
         except Exception as e:
             write_log(f"ERROR: {e}")
+            try:
+                payload = {
+                    "job_id": job_id,
+                    "status": "failed",
+                    "task": task,
+                    "test_cmd": test_cmd,
+                    "error": str(e),
+                    "finished_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                }
+                failed_job_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+                if running_job_file.exists():
+                    running_job_file.unlink()
+            except Exception as inner:
+                write_log(f"ERROR: failed to write failed job file: {inner}")
             json_response(self, 500, {
                 "ok": False,
+                "job_id": job_id,
                 "error": str(e),
             })
         finally:
