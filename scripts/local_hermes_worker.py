@@ -15,6 +15,7 @@ MEMORY_DIR.mkdir(parents=True, exist_ok=True)
 
 WORKER_LOG = LOG_DIR / "local_worker.log"
 LATEST_JSON = MEMORY_DIR / "latest_result_compact.json"
+LOCK_FILE = MEMORY_DIR / "local_worker.lock"
 
 HOST = "127.0.0.1"
 PORT = 8787
@@ -44,6 +45,7 @@ class HermesWorkerHandler(BaseHTTPRequestHandler):
                 "message": "Local Hermes Worker is running",
                 "root": str(ROOT),
                 "latest_json_exists": LATEST_JSON.exists(),
+                "busy": LOCK_FILE.exists(),
             })
             return
 
@@ -86,6 +88,14 @@ class HermesWorkerHandler(BaseHTTPRequestHandler):
             json_response(self, 400, {"ok": False, "error": "task is required"})
             return
 
+        if LOCK_FILE.exists():
+            json_response(self, 409, {
+                "ok": False,
+                "error": "worker busy",
+                "message": "현재 Local Hermes Worker가 다른 작업을 실행 중입니다."
+            })
+            return
+
         if not test_cmd:
             test_cmd = "python3 -m py_compile workspace/*.py"
 
@@ -105,6 +115,7 @@ class HermesWorkerHandler(BaseHTTPRequestHandler):
         env["PYTHONUNBUFFERED"] = "1"
 
         started = time.time()
+        LOCK_FILE.write_text(str(started), encoding="utf-8")
 
         try:
             proc = subprocess.run(
@@ -151,6 +162,12 @@ class HermesWorkerHandler(BaseHTTPRequestHandler):
                 "ok": False,
                 "error": str(e),
             })
+        finally:
+            try:
+                if LOCK_FILE.exists():
+                    LOCK_FILE.unlink()
+            except Exception as e:
+                write_log(f"ERROR: failed to remove lock file: {e}")
 
     def log_message(self, format, *args):
         write_log(f"HTTP {self.address_string()} {format % args}")
