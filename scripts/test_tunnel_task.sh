@@ -32,7 +32,7 @@ cat > /tmp/hermes_local_task.json <<'JSON'
 }
 JSON
 
-curl -X POST "$URL/run-task" \
+curl -sS -X POST "$URL/run-task" \
   -H "Content-Type: application/json" \
   -H "X-Hermes-Token: $TOKEN" \
   --data-binary @/tmp/hermes_local_task.json

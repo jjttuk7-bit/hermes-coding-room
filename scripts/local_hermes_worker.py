@@ -427,11 +427,24 @@ class HermesWorkerHandler(BaseHTTPRequestHandler):
                 except Exception as e:
                     latest = {"ok": False, "error": f"failed to parse latest json: {e}"}
 
+            summary = {
+                "ok": proc.returncode == 0,
+                "result": latest.get("result", "unknown") if isinstance(latest, dict) else "unknown",
+                "job_id": job_id,
+                "exit_code": proc.returncode,
+                "duration_sec": duration,
+                "task": latest.get("task", task) if isinstance(latest, dict) else task,
+                "test_cmd": latest.get("test_cmd", test_cmd) if isinstance(latest, dict) else test_cmd,
+                "test_output": latest.get("test_output", "") if isinstance(latest, dict) else "",
+                "message": latest.get("message", "") if isinstance(latest, dict) else "",
+            }
+
             response_payload = {
                 "ok": proc.returncode == 0,
                 "job_id": job_id,
                 "exit_code": proc.returncode,
                 "duration_sec": duration,
+                "summary": summary,
                 "latest": latest,
                 "stdout_tail": proc.stdout[-2000:],
                 "stderr_tail": proc.stderr[-2000:],
