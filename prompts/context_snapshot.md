@@ -1,0 +1,179 @@
+# Hermes Coding Room Context Snapshot
+
+## CLAUDE.md
+# Hermes Coding Room
+
+이 폴더는 Hermes Agent가 Claude Code와 Codex를 tmux 기반으로 오케스트레이션하기 위한 실험 작업실이다.
+
+## 목적
+
+Hermes는 상위 오케스트레이터 역할을 한다.
+Claude Code는 코드베이스 분석, 설계 검토, 리팩터링 방향 제안, 최종 리뷰를 담당한다.
+Codex는 구현, 파일 수정, 테스트 코드 작성, 빠른 패치를 담당한다.
+Test Runner는 실행, 빌드, 테스트, 로그 확인을 담당한다.
+
+## 기본 역할 분담
+
+- PANE 0: Hermes Orchestrator
+- PANE 1: Claude Code
+- PANE 2: Codex
+- PANE 3: Test Runner
+
+## 운영 규칙
+
+1. Claude Code는 기본적으로 분석과 리뷰를 담당한다.
+2. Codex는 구현과 수정 작업을 담당한다.
+3. 테스트는 Test Runner pane에서 실행한다.
+4. 두 에이전트가 동시에 같은 파일을 수정하지 않는다.
+5. 최종 push나 배포는 사람의 승인 후 진행한다.
+
+## 폴더 구조
+
+- logs: Claude, Codex, Test Runner의 출력 로그 저장
+- prompts: 반복 사용할 프롬프트 저장
+- scripts: tmux pane 제어 스크립트 저장
+- workspace: 실제 코드 실험 공간
+
+## 이 작업실의 한 문장 정의
+
+Hermes Coding Room은 Hermes가 Claude Code와 Codex를 각각 설계자와 구현자로 호출하고, 테스트와 리뷰까지 조율하는 tmux 기반 멀티 코딩 에이전트 작업실이다.
+
+## 현재 운영 상태 메모
+
+현재 Codex 구현은 tmux 대화형 pane이 아니라 `codex exec --skip-git-repo-check --sandbox workspace-write` 방식으로 수행한다.
+
+greet2.py, greet3.py, greet4.py 실패는 과거 tmux 대화형 Codex 호출 방식의 실패 이력이다. 현재 기준으로는 greet_test.py, greet5.py, greet6.py, greet7.py, greet8.py 생성 및 실행이 성공했으므로 Codex exec 방식은 정상 작동 중이다.
+
+Claude Code는 절대 파일을 생성하거나 수정하지 않고, 설계·리뷰·실패 분석만 담당한다. 실제 구현은 Codex exec가 담당한다.
+
+## Project State
+# Hermes Coding Room Project State
+
+## 현재 상태
+
+Hermes Coding Room은 tmux 기반 멀티 코딩 에이전트 작업실이다.
+
+- Claude Code: 설계 / 리뷰 / 실패 분석 담당
+- Codex exec: 실제 파일 생성 / 구현 담당
+- Test Runner: 실행 / 검증 담당
+- orchestrate.sh v0.2: 작업 요청 + 검증 명령을 받아 전체 루프 실행
+
+## 현재 정상 작동 확인
+
+- workspace/hello_codex.py 실행 성공
+- workspace/greet.py 실행 성공
+- workspace/greet_test.py 실행 성공
+- workspace/greet5.py 실행 성공
+- workspace/greet6.py 실행 성공
+- workspace/greet7.py 실행 성공
+- workspace/greet8.py 실행 성공
+
+## 이전 실패 이력
+
+- greet2.py, greet3.py, greet4.py는 생성되지 않아 실패했다.
+- 원인은 초기 Codex tmux 대화형 호출 방식이 실제 파일 생성을 안정적으로 완료하지 못했기 때문이다.
+- 이후 ask_codex.sh를 codex exec 방식으로 변경하면서 문제가 해결되었다.
+
+## 현재 Codex 실행 방식
+
+Codex는 tmux pane 대화형이 아니라 다음 방식으로 실행한다.
+
+codex exec --skip-git-repo-check --sandbox workspace-write
+
+## 다음 개선 목표
+
+- 실패 시 Codex에게 test.log를 전달해 자동 재수정하는 orchestrate.sh v0.3 만들기
+- 작업별 로그를 latest와 runs 디렉터리로 분리하기
+- memory/task_history.md에 작업 이력 누적하기
+
+## Latest Run
+# Latest Hermes Coding Room Run
+
+- 시간: 20260626_153005
+- 요청: workspace/discount.py 파일을 만들어줘. 원가와 할인율을 명령행 인자로 받아 할인 적용 가격을 정수로 출력하게 해줘. 예: 10000 20이면 8000을 출력해줘.
+- 검증 명령: python3 workspace/discount.py 10000 20
+- 결과: 성공
+- 실행 폴더: logs/runs/20260626_153005
+- 리포트: logs/runs/20260626_153005/final_report.md
+
+## Recent Task History
+
+## 작업 이력
+- 시간: 20260626_145927
+- 요청: workspace/greet11.py 파일을 반드시 새로 만들어줘. Python 스크립트이고, 첫 번째 명령행 인자를 이름으로 받아서 Hello, 이름! 을 출력해야 해.
+- 검증 명령: python3 workspace/greet11.py Jeff
+- 결과: 성공
+- 실행 폴더: logs/runs/20260626_145927
+- 리포트: logs/runs/20260626_145927/final_report.md
+
+## 작업 이력
+- 시간: 20260626_150219
+- 요청: workspace/greet12.py 파일을 반드시 새로 만들어줘. Python 스크립트이고, 첫 번째 명령행 인자를 이름으로 받아서 Hello, 이름! 을 출력해야 해.
+- 검증 명령: python3 workspace/greet12.py Jeff
+- 결과: 성공
+- 실행 폴더: logs/runs/20260626_150219
+- 리포트: logs/runs/20260626_150219/final_report.md
+
+## 작업 이력
+- 시간: 20260626_150418
+- 요청: workspace/add_two.py 파일을 만들어줘. 정수 두 개를 명령행 인자로 받아 합계를 출력하게 해줘.
+- 검증 명령: python3 workspace/add_two.py 3 5
+- 결과: 성공
+- 실행 폴더: logs/runs/20260626_150418
+- 리포트: logs/runs/20260626_150418/final_report.md
+
+## 작업 이력
+- 시간: 20260626_150725
+- 요청: workspace/add_two.py 파일을 만들어줘. 정수 두 개를 명령행 인자로 받아 합계를 출력하게 해줘.
+- 검증 명령: python3 workspace/add_two.py 3 5
+- 결과: 성공
+- 실행 폴더: logs/runs/20260626_150725
+- 리포트: logs/runs/20260626_150725/final_report.md
+
+## 작업 이력
+- 시간: 20260626_151035
+- 요청: workspace/multiply.py 파일을 만들어줘. 정수 두 개를 명령행 인자로 받아 곱을 출력하게 해줘.
+- 검증 명령: python3 workspace/multiply.py 4 7
+- 결과: 성공
+- 실행 폴더: logs/runs/20260626_151035
+- 리포트: logs/runs/20260626_151035/final_report.md
+
+## 작업 이력
+- 시간: 20260626_151319
+- 요청: workspace/divide.py 파일을 만들어줘. 숫자 두 개를 명령행 인자로 받아 첫 번째 숫자를 두 번째 숫자로 나눈 결과를 출력하게 해줘.
+- 검증 명령: python3 workspace/divide.py 10 2
+- 결과: 성공
+- 실행 폴더: logs/runs/20260626_151319
+- 리포트: logs/runs/20260626_151319/final_report.md
+
+## 작업 이력
+- 시간: 20260626_151537
+- 요청: workspace/subtract.py 파일을 만들어줘. 정수 두 개를 명령행 인자로 받아 첫 번째 숫자에서 두 번째 숫자를 뺀 값을 출력하게 해줘.
+- 검증 명령: python3 workspace/subtract.py 10 3
+- 결과: 성공
+- 실행 폴더: logs/runs/20260626_151537
+- 리포트: logs/runs/20260626_151537/final_report.md
+
+## 작업 이력
+- 시간: 20260626_152203
+- 요청: workspace/sales_calc.py 파일을 만들어줘. 상품 가격과 수량을 명령행 인자로 받아 총액을 출력하게 해줘.
+- 검증 명령: python3 workspace/sales_calc.py 15000 3
+- 결과: 성공
+- 실행 폴더: logs/runs/20260626_152203
+- 리포트: logs/runs/20260626_152203/final_report.md
+
+## 작업 이력
+- 시간: 20260626_152553
+- 요청: workspace/price_with_tax.py 파일을 만들어줘. 가격과 세율을 명령행 인자로 받아 세금 포함 가격을 출력하게 해줘. 예: 10000 10이면 11000을 출력해줘.
+- 검증 명령: python3 workspace/price_with_tax.py 10000 10
+- 결과: 성공
+- 실행 폴더: logs/runs/20260626_152553
+- 리포트: logs/runs/20260626_152553/final_report.md
+
+## 작업 이력
+- 시간: 20260626_153005
+- 요청: workspace/discount.py 파일을 만들어줘. 원가와 할인율을 명령행 인자로 받아 할인 적용 가격을 정수로 출력하게 해줘. 예: 10000 20이면 8000을 출력해줘.
+- 검증 명령: python3 workspace/discount.py 10000 20
+- 결과: 성공
+- 실행 폴더: logs/runs/20260626_153005
+- 리포트: logs/runs/20260626_153005/final_report.md
