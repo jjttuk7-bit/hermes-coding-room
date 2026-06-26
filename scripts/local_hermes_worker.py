@@ -90,6 +90,136 @@ class HermesWorkerHandler(BaseHTTPRequestHandler):
             })
             return
 
+        if self.path == "/dashboard":
+            jobs = []
+            for status, directory in [
+                ("running", JOBS_RUNNING_DIR),
+                ("done", JOBS_DONE_DIR),
+                ("failed", JOBS_FAILED_DIR),
+            ]:
+                for file in sorted(directory.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:10]:
+                    try:
+                        item = json.loads(file.read_text(encoding="utf-8"))
+                        item.setdefault("status", status)
+                        jobs.append(item)
+                    except Exception:
+                        pass
+
+            jobs = sorted(
+                jobs,
+                key=lambda item: item.get("finished_at") or item.get("created_at") or "",
+                reverse=True
+            )[:20]
+
+            latest_html = ""
+            if LATEST_JSON.exists():
+                try:
+                    latest_html = LATEST_JSON.read_text(encoding="utf-8")
+                except Exception as e:
+                    latest_html = f"failed to read latest: {e}"
+
+            rows = []
+            for job in jobs:
+                rows.append(f"""
+                <tr>
+                  <td>{job.get('status', '')}</td>
+                  <td>{job.get('job_id', '')}</td>
+                  <td>{job.get('exit_code', '')}</td>
+                  <td>{job.get('test_cmd', '')}</td>
+                  <td>{job.get('latest', {}).get('test_output', '')}</td>
+                  <td>{job.get('finished_at') or job.get('created_at') or ''}</td>
+                </tr>
+                """)
+
+            html = f"""<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Hermes Local Worker Dashboard</title>
+  <style>
+    body {{
+      font-family: Arial, sans-serif;
+      margin: 24px;
+      background: #f7f7f7;
+      color: #222;
+    }}
+    h1 {{ margin-bottom: 8px; }}
+    .card {{
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }}
+    table {{
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+    }}
+    th, td {{
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+      vertical-align: top;
+      font-size: 13px;
+    }}
+    th {{ background: #eee; }}
+    pre {{
+      white-space: pre-wrap;
+      background: #111;
+      color: #eee;
+      padding: 12px;
+      border-radius: 8px;
+      overflow-x: auto;
+    }}
+    .ok {{ color: green; font-weight: bold; }}
+    .busy {{ color: orange; font-weight: bold; }}
+  </style>
+</head>
+<body>
+  <h1>Hermes Local Worker Dashboard</h1>
+
+  <div class="card">
+    <p>Root: {ROOT}</p>
+    <p>Status: <span class="ok">running</span></p>
+    <p>Busy: <span class="busy">{LOCK_FILE.exists()}</span></p>
+    <p>Latest JSON exists: {LATEST_JSON.exists()}</p>
+  </div>
+
+  <div class="card">
+    <h2>Latest Result</h2>
+    <pre>{latest_html}</pre>
+  </div>
+
+  <div class="card">
+    <h2>Recent Jobs</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Job ID</th>
+          <th>Exit</th>
+          <th>Test Cmd</th>
+          <th>Output</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        {''.join(rows)}
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>"""
+
+            body = html.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         if self.path == "/latest":
             if LATEST_JSON.exists():
                 try:
