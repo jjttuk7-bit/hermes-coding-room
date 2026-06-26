@@ -32,3 +32,4 @@ workspace/tunnel_auto_script_check.py
 workspace/tunnel_script_check.py
 workspace/tunnel_script_manual_check.py
 workspace/task_request_missing.txt
+secrets/

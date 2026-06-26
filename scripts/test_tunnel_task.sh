@@ -4,7 +4,18 @@ set -e
 ROOT="$HOME/hermes-coding-room"
 cd "$ROOT"
 
-TOKEN="${LOCAL_HERMES_TOKEN:-jeff-local-hermes-001}"
+if [ -f "$ROOT/secrets/local_hermes.env" ]; then
+  set -a
+  . "$ROOT/secrets/local_hermes.env"
+  set +a
+fi
+
+TOKEN="${LOCAL_HERMES_TOKEN:-}"
+if [ -z "$TOKEN" ]; then
+  echo "LOCAL_HERMES_TOKEN이 설정되어 있지 않습니다."
+  echo "secrets/local_hermes.env 파일을 확인하세요."
+  exit 1
+fi
 
 if [ ! -f memory/current_tunnel_url.txt ]; then
   echo "memory/current_tunnel_url.txt 파일이 없습니다."

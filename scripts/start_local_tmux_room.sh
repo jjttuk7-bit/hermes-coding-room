@@ -3,9 +3,21 @@ set -e
 
 SESSION="hermes-local"
 ROOT="$HOME/hermes-coding-room"
-TOKEN="${LOCAL_HERMES_TOKEN:-jeff-local-hermes-001}"
 
 cd "$ROOT"
+
+if [ -f "$ROOT/secrets/local_hermes.env" ]; then
+  set -a
+  . "$ROOT/secrets/local_hermes.env"
+  set +a
+fi
+
+TOKEN="${LOCAL_HERMES_TOKEN:-}"
+if [ -z "$TOKEN" ]; then
+  echo "LOCAL_HERMES_TOKEN이 설정되어 있지 않습니다."
+  echo "secrets/local_hermes.env 파일을 확인하세요."
+  exit 1
+fi
 
 mkdir -p logs memory workspace
 
