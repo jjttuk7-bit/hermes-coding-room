@@ -3,6 +3,7 @@ import json
 import os
 import subprocess
 import time
+from urllib.parse import unquote
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
@@ -98,6 +99,40 @@ class HermesWorkerHandler(BaseHTTPRequestHandler):
                 json_response(self, 200, payload)
             else:
                 json_response(self, 404, {"ok": False, "error": "latest_result_compact.json not found"})
+            return
+
+        if self.path.startswith("/job/"):
+            job_id = unquote(self.path.replace("/job/", "", 1).strip())
+
+            if not job_id or "/" in job_id or ".." in job_id:
+                json_response(self, 400, {
+                    "ok": False,
+                    "error": "invalid job_id",
+                })
+                return
+
+            for directory in [JOBS_RUNNING_DIR, JOBS_DONE_DIR, JOBS_FAILED_DIR]:
+                file = directory / f"{job_id}.json"
+                if file.exists():
+                    try:
+                        payload = json.loads(file.read_text(encoding="utf-8"))
+                        payload.setdefault("file", str(file.relative_to(ROOT)))
+                        json_response(self, 200, {
+                            "ok": True,
+                            "job": payload,
+                        })
+                    except Exception as e:
+                        json_response(self, 500, {
+                            "ok": False,
+                            "error": f"failed to read job file: {e}",
+                        })
+                    return
+
+            json_response(self, 404, {
+                "ok": False,
+                "error": "job not found",
+                "job_id": job_id,
+            })
             return
 
         if self.path.startswith("/jobs"):
