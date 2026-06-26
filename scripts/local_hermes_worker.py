@@ -17,6 +17,23 @@ WORKER_LOG = LOG_DIR / "local_worker.log"
 LATEST_JSON = MEMORY_DIR / "latest_result_compact.json"
 LOCK_FILE = MEMORY_DIR / "local_worker.lock"
 
+BLOCKED_PATTERNS = [
+    "rm -rf",
+    "sudo ",
+    "shutdown",
+    "reboot",
+    "mkfs",
+    ":(){",
+    "chmod -R 777 /",
+    "chown -R",
+    "curl ",
+    "wget ",
+    "| sh",
+    "| bash",
+    "dd if=",
+    "> /dev/sd",
+]
+
 HOST = "127.0.0.1"
 PORT = 8787
 LOCAL_HERMES_TOKEN = os.environ.get("LOCAL_HERMES_TOKEN", "")
@@ -26,6 +43,14 @@ def write_log(message: str):
     ts = time.strftime("%Y-%m-%d %H:%M:%S")
     with WORKER_LOG.open("a", encoding="utf-8") as f:
         f.write(f"[{ts}] {message}\n")
+
+
+def find_blocked_pattern(value: str):
+    lowered = value.lower()
+    for pattern in BLOCKED_PATTERNS:
+        if pattern.lower() in lowered:
+            return pattern
+    return None
 
 
 def json_response(handler, status_code: int, payload: dict):
@@ -86,6 +111,20 @@ class HermesWorkerHandler(BaseHTTPRequestHandler):
 
         if not task:
             json_response(self, 400, {"ok": False, "error": "task is required"})
+            return
+
+        blocked_in_task = find_blocked_pattern(task)
+        blocked_in_test_cmd = find_blocked_pattern(test_cmd)
+
+        if blocked_in_task or blocked_in_test_cmd:
+            blocked = blocked_in_task or blocked_in_test_cmd
+            write_log(f"BLOCKED dangerous pattern: {blocked}")
+            json_response(self, 400, {
+                "ok": False,
+                "error": "blocked dangerous command",
+                "blocked_pattern": blocked,
+                "message": "위험할 수 있는 명령 패턴이 감지되어 작업을 실행하지 않았습니다."
+            })
             return
 
         if LOCK_FILE.exists():
