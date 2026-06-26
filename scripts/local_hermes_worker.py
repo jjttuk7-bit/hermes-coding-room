@@ -120,10 +120,12 @@ class HermesWorkerHandler(BaseHTTPRequestHandler):
 
             rows = []
             for job in jobs:
+                job_id = job.get('job_id', '')
+                job_link = f'<a href="/job/{job_id}" target="_blank">{job_id}</a>' if job_id else ''
                 rows.append(f"""
                 <tr>
                   <td>{job.get('status', '')}</td>
-                  <td>{job.get('job_id', '')}</td>
+                  <td>{job_link}</td>
                   <td>{job.get('exit_code', '')}</td>
                   <td>{job.get('test_cmd', '')}</td>
                   <td>{job.get('latest', {}).get('test_output', '')}</td>
@@ -135,6 +137,7 @@ class HermesWorkerHandler(BaseHTTPRequestHandler):
 <html>
 <head>
   <meta charset="utf-8">
+  <meta http-equiv="refresh" content="5">
   <title>Hermes Local Worker Dashboard</title>
   <style>
     body {{
@@ -174,7 +177,24 @@ class HermesWorkerHandler(BaseHTTPRequestHandler):
     }}
     .ok {{ color: green; font-weight: bold; }}
     .busy {{ color: orange; font-weight: bold; }}
+    a {{
+      color: #1565c0;
+      text-decoration: none;
+      font-weight: bold;
+    }}
+    a:hover {{
+      text-decoration: underline;
+    }}
+    .small {{
+      color: #666;
+      font-size: 12px;
+    }}
   </style>
+<script>
+  setTimeout(function() {{
+    window.location.reload();
+  }}, 5000);
+</script>
 </head>
 <body>
   <h1>Hermes Local Worker Dashboard</h1>
@@ -184,6 +204,7 @@ class HermesWorkerHandler(BaseHTTPRequestHandler):
     <p>Status: <span class="ok">running</span></p>
     <p>Busy: <span class="busy">{LOCK_FILE.exists()}</span></p>
     <p>Latest JSON exists: {LATEST_JSON.exists()}</p>
+    <p class="small">This dashboard auto-refreshes every 5 seconds.</p>
   </div>
 
   <div class="card">
