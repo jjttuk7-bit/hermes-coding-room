@@ -16,3 +16,5 @@ memory/latest_result_compact.json
 prompts/codex_task.txt
 prompts/context_snapshot.md
 workspace/*_request_missing.md
+memory/task_history.md
+workspace/final_check.py
