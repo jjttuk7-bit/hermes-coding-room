@@ -100,6 +100,39 @@ class HermesWorkerHandler(BaseHTTPRequestHandler):
                 json_response(self, 404, {"ok": False, "error": "latest_result_compact.json not found"})
             return
 
+        if self.path.startswith("/jobs"):
+            jobs = []
+            for status, directory in [
+                ("running", JOBS_RUNNING_DIR),
+                ("done", JOBS_DONE_DIR),
+                ("failed", JOBS_FAILED_DIR),
+            ]:
+                for file in sorted(directory.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:20]:
+                    try:
+                        item = json.loads(file.read_text(encoding="utf-8"))
+                        item.setdefault("status", status)
+                        item.setdefault("file", str(file.relative_to(ROOT)))
+                        jobs.append(item)
+                    except Exception as e:
+                        jobs.append({
+                            "status": status,
+                            "file": str(file.relative_to(ROOT)),
+                            "error": f"failed to read job file: {e}",
+                        })
+
+            jobs = sorted(
+                jobs,
+                key=lambda item: item.get("finished_at") or item.get("created_at") or "",
+                reverse=True
+            )[:30]
+
+            json_response(self, 200, {
+                "ok": True,
+                "count": len(jobs),
+                "jobs": jobs,
+            })
+            return
+
         json_response(self, 404, {"ok": False, "error": "not found"})
 
     def do_POST(self):
