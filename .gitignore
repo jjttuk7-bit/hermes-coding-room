@@ -18,3 +18,17 @@ prompts/context_snapshot.md
 workspace/*_request_missing.md
 memory/task_history.md
 workspace/final_check.py
+
+# Local bridge runtime files
+memory/current_tunnel_url.txt
+logs/cloudflared_tunnel.log
+
+# Local bridge test files
+workspace/local_tmux_check.py
+workspace/local_token_check.py
+workspace/telegram_local_tmux_check.py
+workspace/tunnel_check.py
+workspace/tunnel_auto_script_check.py
+workspace/tunnel_script_check.py
+workspace/tunnel_script_manual_check.py
+workspace/task_request_missing.txt
