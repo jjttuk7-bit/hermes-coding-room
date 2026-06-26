@@ -234,11 +234,16 @@ class HermesWorkerHandler(BaseHTTPRequestHandler):
 </html>"""
 
             body = html.encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            try:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except BrokenPipeError:
+                # Browser refreshed or closed the dashboard while response was being sent.
+                # This is harmless and should not pollute the tmux worker pane.
+                pass
             return
 
         if self.path == "/latest":
@@ -521,7 +526,19 @@ class HermesWorkerHandler(BaseHTTPRequestHandler):
                 write_log(f"ERROR: failed to remove lock file: {e}")
 
     def log_message(self, format, *args):
-        write_log(f"HTTP {self.address_string()} {format % args}")
+        message = format % args
+
+        # Keep tmux worker log focused on real work.
+        # Hide noisy polling/view endpoints such as dashboard auto-refresh.
+        if (
+            "GET /dashboard " in message
+            or "GET /health " in message
+            or "GET /latest " in message
+            or "GET /jobs " in message
+        ):
+            return
+
+        write_log(f"HTTP {self.address_string()} {message}")
 
 
 def main():
