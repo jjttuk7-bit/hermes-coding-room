@@ -6,3 +6,13 @@ __pycache__/
 *.pyc
 logs/
 logs/
+
+# Runtime logs and generated state
+logs/
+memory/latest_run.md
+memory/latest_summary.md
+memory/latest_result.json
+memory/latest_result_compact.json
+prompts/codex_task.txt
+prompts/context_snapshot.md
+workspace/*_request_missing.md
